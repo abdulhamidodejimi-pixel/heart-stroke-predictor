@@ -55,3 +55,5 @@ if st.button("🔍 Predict Risk"):
         st.warning("• Monitor blood pressure\n• Avoid smoking\n• Control cholesterol")
     else:
         st.success("Stroke risk appears low. Continue preventive care.")
+        st.write("Heart model expects:", heart_model.n_features_in_, "features")
+st.write("Stroke model expects:", stroke_model.n_features_in_, "features")
