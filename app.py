@@ -1,154 +1,110 @@
 import streamlit as st
 import numpy as np
-import pandas as pd
-import joblib
+import pickle
 
-st.set_page_config(page_title="Heart & Stroke Prediction", layout="wide")
+# Load models
+heart_model = pickle.load(open("heart_model.pkl", "rb"))
+stroke_model = pickle.load(open("stroke_model.pkl", "rb"))
 
-# LOAD MODELS
-heart_model = joblib.load("heart_model.pkl")
-stroke_model = joblib.load("stroke_model.pkl")
+st.title("AI Health Prediction System")
+st.write("Predict Heart Disease and Stroke Risk")
 
-st.title("🩺 AI Heart & Stroke Risk Prediction System")
-st.write("Enter patient details on the left and choose prediction type.")
+st.subheader("Enter Patient Details")
 
-# ---------------- SIDEBAR INPUTS ---------------- #
+# HEART DATA INPUTS
+age = st.number_input("Age", 1, 120, 30)
+sex = st.selectbox("Sex", [0,1])
+cp = st.selectbox("Chest Pain Type (cp)", [0,1,2,3])
+trestbps = st.number_input("Resting Blood Pressure", 80, 200, 120)
+chol = st.number_input("Cholesterol Level", 100, 600, 200)
+fbs = st.selectbox("Fasting Blood Sugar >120", [0,1])
+restecg = st.selectbox("Rest ECG", [0,1,2])
+thalach = st.number_input("Max Heart Rate", 60, 220, 150)
+exang = st.selectbox("Exercise Induced Angina", [0,1])
+oldpeak = st.number_input("Oldpeak", 0.0, 10.0, 1.0)
+slope = st.selectbox("Slope", [0,1,2])
+ca = st.selectbox("Number of Major Vessels", [0,1,2,3])
+thal = st.selectbox("Thal", [0,1,2,3])
 
-st.sidebar.header("Patient Details")
+heart_input = np.array([[age,sex,cp,trestbps,chol,fbs,restecg,
+                         thalach,exang,oldpeak,slope,ca,thal]])
 
-age = st.sidebar.slider("Age",1,100,30)
-sex = st.sidebar.selectbox("Sex",["Male","Female"])
+# STROKE INPUTS
+st.subheader("Stroke Related Information")
 
-# HEART FEATURES
-cp = st.sidebar.slider("Chest Pain Type",0,3)
-trestbps = st.sidebar.number_input("Resting Blood Pressure",80,200,120)
-chol = st.sidebar.number_input("Cholesterol",100,400,200)
-fbs = st.sidebar.selectbox("Fasting Blood Sugar >120",[0,1])
-restecg = st.sidebar.slider("Rest ECG",0,2)
-thalach = st.sidebar.number_input("Max Heart Rate",60,220,150)
-exang = st.sidebar.selectbox("Exercise Angina",[0,1])
-oldpeak = st.sidebar.slider("Oldpeak",0.0,6.0,1.0)
-slope = st.sidebar.slider("Slope",0,2)
-ca = st.sidebar.slider("Number of Vessels (ca)",0,4)
-thal = st.sidebar.slider("Thal",0,3)
+hypertension = st.selectbox("Hypertension", [0,1])
+heart_disease = st.selectbox("Heart Disease History", [0,1])
+avg_glucose_level = st.number_input("Average Glucose Level", 50.0, 300.0, 100.0)
+bmi = st.number_input("BMI", 10.0, 60.0, 25.0)
 
-# STROKE FEATURES
-hypertension = st.sidebar.selectbox("Hypertension",[0,1])
-heart_disease = st.sidebar.selectbox("Existing Heart Disease",[0,1])
-glucose = st.sidebar.number_input("Glucose Level",50,300,100)
-bmi = st.sidebar.number_input("BMI",10.0,50.0,25.0)
+stroke_input = np.array([[age, hypertension, heart_disease,
+                          avg_glucose_level, bmi]])
 
-smoking = st.sidebar.selectbox(
-"Smoking Status",
-["never smoked","formerly smoked","smokes"]
-)
+st.write("---")
 
-married = st.sidebar.selectbox(
-"Ever Married",
-["Yes","No"]
-)
+# HEART PREDICTION
+if st.button("Predict Heart Disease"):
 
-work = st.sidebar.selectbox(
-"Work Type",
-["Private","Self-employed","Govt_job","children"]
-)
+    try:
+        prediction = heart_model.predict(heart_input)[0]
+        probability = heart_model.predict_proba(heart_input)[0][1] * 100
 
-residence = st.sidebar.selectbox(
-"Residence Type",
-["Urban","Rural"]
-)
+        if prediction == 1:
+            st.error(f"High Risk of Heart Disease ({probability:.2f}%)")
+        else:
+            st.success(f"Low Risk of Heart Disease ({100-probability:.2f}%)")
 
-# ---------------- HEART INPUT ---------------- #
+    except:
+        st.error("Heart prediction failed. Check model inputs.")
 
-sex_num = 1 if sex=="Male" else 0
 
-heart_input = np.array([[
-age,sex_num,cp,trestbps,chol,fbs,
-restecg,thalach,exang,oldpeak,
-slope,ca,thal
-]])
+# STROKE PREDICTION
+if st.button("Predict Stroke"):
 
-# ---------------- STROKE INPUT ---------------- #
+    try:
+        prediction = stroke_model.predict(stroke_input)[0]
+        probability = stroke_model.predict_proba(stroke_input)[0][1] * 100
 
-stroke_input = pd.DataFrame({
-"gender":[sex],
-"age":[age],
-"hypertension":[hypertension],
-"heart_disease":[heart_disease],
-"ever_married":[married],
-"work_type":[work],
-"Residence_type":[residence],
-"avg_glucose_level":[glucose],
-"bmi":[bmi],
-"smoking_status":[smoking]
-})
+        if prediction == 1:
+            st.error(f"Stroke Risk Detected ({probability:.2f}%)")
+        else:
+            st.success(f"No Stroke Detected ({100-probability:.2f}%)")
 
-# convert categories like training
-stroke_input = pd.get_dummies(stroke_input)
+    except:
+        st.error("Stroke prediction failed. Model input mismatch.")
 
-# force columns to match model training
-model_columns = stroke_model.feature_names_in_
-stroke_input = stroke_input.reindex(columns=model_columns, fill_value=0)
 
-# ---------------- BUTTONS ---------------- #
+# BOTH PREDICTION
+if st.button("Predict Both"):
 
-col1,col2,col3 = st.columns(3)
+    try:
+        # HEART
+        heart_prediction = heart_model.predict(heart_input)[0]
+        heart_prob = heart_model.predict_proba(heart_input)[0][1] * 100
 
-with col1:
-    heart_btn = st.button("❤️ Predict Heart Disease")
+        if heart_prediction == 1:
+            heart_result = f"High Risk ({heart_prob:.2f}%)"
+        else:
+            heart_result = f"Low Risk ({100-heart_prob:.2f}%)"
 
-with col2:
-    stroke_btn = st.button("🧠 Predict Stroke")
+        # STROKE
+        stroke_prediction = stroke_model.predict(stroke_input)[0]
+        stroke_prob = stroke_model.predict_proba(stroke_input)[0][1] * 100
 
-with col3:
-    both_btn = st.button("📊 Predict Both")
+        if stroke_prediction == 1:
+            stroke_result = f"Stroke Risk ({stroke_prob:.2f}%)"
+        else:
+            stroke_result = f"No Stroke ({100-stroke_prob:.2f}%)"
 
-# ---------------- HEART ---------------- #
+        st.subheader("Prediction Results")
 
-if heart_btn:
+        col1, col2 = st.columns(2)
 
-    pred = heart_model.predict(heart_input)[0]
-    prob = heart_model.predict_proba(heart_input)[0][1]
+        with col1:
+            st.metric("Heart Disease Risk", heart_result)
 
-    st.subheader("Heart Disease Result")
+        with col2:
+            st.metric("Stroke Risk", stroke_result)
 
-    if pred==1:
-        st.error(f"High Risk of Heart Disease ({prob*100:.1f}%)")
-    else:
-        st.success(f"Low Risk of Heart Disease ({prob*100:.1f}%)")
-
-# ---------------- STROKE ---------------- #
-
-if stroke_btn:
-
-    pred = stroke_model.predict(stroke_input)[0]
-    prob = stroke_model.predict_proba(stroke_input)[0][1]
-
-    st.subheader("Stroke Result")
-
-    if pred==1:
-        st.error(f"High Risk of Stroke ({prob*100:.1f}%)")
-    else:
-        st.success(f"Low Risk of Stroke ({prob*100:.1f}%)")
-
-# ---------------- BOTH ---------------- #
-
-if both_btn:
-
-    st.subheader("Overall Diagnosis")
-
-    heart_pred = heart_model.predict(heart_input)[0]
-    heart_prob = heart_model.predict_proba(heart_input)[0][1]
-
-    stroke_pred = stroke_model.predict(stroke_input)[0]
-    stroke_prob = stroke_model.predict_proba(stroke_input)[0][1]
-
-    if heart_pred==1:
-        st.error(f"Heart Disease Risk: {heart_prob*100:.1f}%")
-    else:
-        st.success(f"No Heart Disease ({heart_prob*100:.1f}%)")
-
-    if stroke_pred==1:
-        st.error(f"Stroke Risk: {stroke_prob*100:.1f}%")
-    else:
-        st.success(f"No Stroke Risk ({stroke_prob*100:.1f}%)")
+    except:
+        st.error("Prediction failed. Check model inputs.")
