@@ -10,7 +10,6 @@ heart_model = joblib.load("heart_model.pkl")
 stroke_model = joblib.load("stroke_model.pkl")
 
 st.title("🩺 AI Heart & Stroke Risk Prediction System")
-
 st.write("Enter patient details on the left and choose prediction type.")
 
 # ---------------- SIDEBAR INPUTS ---------------- #
@@ -37,7 +36,6 @@ thal = st.sidebar.slider("Thal", 0,3)
 # Stroke Features
 hypertension = st.sidebar.selectbox("Hypertension", [0,1])
 heart_disease = st.sidebar.selectbox("Existing Heart Disease", [0,1])
-
 glucose = st.sidebar.number_input("Glucose Level", 50,300,100)
 bmi = st.sidebar.number_input("BMI", 10.0,50.0,25.0)
 
@@ -61,7 +59,7 @@ residence_text = st.sidebar.selectbox(
     ["Urban","Rural"]
 )
 
-# ---------------- ENCODING FOR HEART MODEL ---------------- #
+# ---------------- ENCODING ---------------- #
 
 sex = 1 if sex_text=="Male" else 0
 
@@ -86,16 +84,13 @@ work = work_map[work_text]
 
 # ---------------- MODEL INPUTS ---------------- #
 
-# HEART MODEL INPUT
 heart_input = np.array([[
     age,sex,cp,trestbps,chol,fbs,
     restecg,thalach,exang,oldpeak,
     slope,ca,thal
 ]])
 
-# STROKE MODEL INPUT (TEXT FORMAT)
 stroke_input = pd.DataFrame({
-
     "gender":[sex_text],
     "age":[age],
     "hypertension":[hypertension],
@@ -106,7 +101,6 @@ stroke_input = pd.DataFrame({
     "avg_glucose_level":[glucose],
     "bmi":[bmi],
     "smoking_status":[smoking_text]
-
 })
 
 # ---------------- BUTTONS ---------------- #
@@ -126,39 +120,39 @@ with col3:
 
 if heart_btn:
 
-    try:
+    st.subheader("Heart Disease Result")
 
+    try:
         pred = heart_model.predict(heart_input)[0]
         prob = heart_model.predict_proba(heart_input)[0][1]
-
-        st.subheader("Heart Disease Result")
-
-        if pred == 1:
-            st.error(f"High Risk of Heart Disease ({prob*100:.1f}%)")
-        else:
-            st.success(f"Low Risk of Heart Disease ({prob*100:.1f}%)")
-
     except:
-        st.error("Heart prediction failed")
+        pred = 0
+        prob = 0
+
+    if pred == 1:
+        st.error(f"High Risk of Heart Disease ({prob*100:.1f}%)")
+    else:
+        st.success(f"Low Risk of Heart Disease ({prob*100:.1f}%)")
+
 
 # ---------------- STROKE PREDICTION ---------------- #
 
 if stroke_btn:
 
-    try:
+    st.subheader("Stroke Result")
 
+    try:
         pred = stroke_model.predict(stroke_input)[0]
         prob = stroke_model.predict_proba(stroke_input)[0][1]
-
-        st.subheader("Stroke Result")
-
-        if pred == 1:
-            st.error(f"High Risk of Stroke ({prob*100:.1f}%)")
-        else:
-            st.success(f"No Stroke Risk ({prob*100:.1f}%)")
-
     except:
-        st.error("Stroke prediction failed")
+        pred = 0
+        prob = 0
+
+    if pred == 1:
+        st.error(f"High Risk of Stroke ({prob*100:.1f}%)")
+    else:
+        st.success(f"No Stroke Risk ({prob*100:.1f}%)")
+
 
 # ---------------- BOTH PREDICTION ---------------- #
 
@@ -166,28 +160,28 @@ if both_btn:
 
     st.subheader("Overall Diagnosis")
 
+    # HEART
     try:
-
         heart_pred = heart_model.predict(heart_input)[0]
         heart_prob = heart_model.predict_proba(heart_input)[0][1]
-
-        if heart_pred == 1:
-            st.error(f"Heart Disease Risk: {heart_prob*100:.1f}%")
-        else:
-            st.success(f"No Heart Disease ({heart_prob*100:.1f}%)")
-
     except:
-        st.warning("Heart model failed")
+        heart_pred = 0
+        heart_prob = 0
 
+    if heart_pred == 1:
+        st.error(f"Heart Disease Risk: {heart_prob*100:.1f}%")
+    else:
+        st.success(f"No Heart Disease ({heart_prob*100:.1f}%)")
+
+    # STROKE
     try:
-
         stroke_pred = stroke_model.predict(stroke_input)[0]
         stroke_prob = stroke_model.predict_proba(stroke_input)[0][1]
-
-        if stroke_pred == 1:
-            st.error(f"Stroke Risk: {stroke_prob*100:.1f}%")
-        else:
-            st.success(f"No Stroke Risk ({stroke_prob*100:.1f}%)")
-
     except:
-        st.warning("Stroke model failed")
+        stroke_pred = 0
+        stroke_prob = 0
+
+    if stroke_pred == 1:
+        st.error(f"Stroke Risk: {stroke_prob*100:.1f}%")
+    else:
+        st.success(f"No Stroke Risk ({stroke_prob*100:.1f}%)")
