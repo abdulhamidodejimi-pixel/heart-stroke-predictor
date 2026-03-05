@@ -1,15 +1,16 @@
 import streamlit as st
 import numpy as np
+import pandas as pd
 import joblib
 
 st.set_page_config(page_title="Heart & Stroke Prediction", layout="wide")
 
-# LOAD MODELS
+# ---------------- LOAD MODELS ---------------- #
+
 heart_model = joblib.load("heart_model.pkl")
 stroke_model = joblib.load("stroke_model.pkl")
 
 st.title("🩺 AI Heart & Stroke Risk Prediction System")
-
 st.write("Enter patient details on the left and choose a prediction type.")
 
 # ---------------- SIDEBAR INPUTS ---------------- #
@@ -20,8 +21,8 @@ st.sidebar.header("Patient Details")
 age = st.sidebar.slider("Age", 1, 100, 30)
 sex = st.sidebar.selectbox("Sex", ["Male", "Female"])
 
-# Heart Disease Features
-cp = st.sidebar.slider("Chest Pain Type (cp)", 0, 3)
+# Heart Disease Inputs
+cp = st.sidebar.slider("Chest Pain Type", 0, 3)
 trestbps = st.sidebar.number_input("Resting Blood Pressure", 80, 200, 120)
 chol = st.sidebar.number_input("Cholesterol", 100, 400, 200)
 fbs = st.sidebar.selectbox("Fasting Blood Sugar >120", [0,1])
@@ -30,13 +31,12 @@ thalach = st.sidebar.number_input("Max Heart Rate", 60,220,150)
 exang = st.sidebar.selectbox("Exercise Angina", [0,1])
 oldpeak = st.sidebar.slider("Oldpeak", 0.0,6.0,1.0)
 slope = st.sidebar.slider("Slope", 0,2)
-ca = st.sidebar.slider("Number of vessels (ca)", 0,4)
+ca = st.sidebar.slider("Number of Vessels (ca)", 0,4)
 thal = st.sidebar.slider("Thal", 0,3)
 
-# Stroke Features
+# Stroke Inputs
 hypertension = st.sidebar.selectbox("Hypertension", [0,1])
 heart_disease = st.sidebar.selectbox("Existing Heart Disease", [0,1])
-
 glucose = st.sidebar.number_input("Glucose Level", 50,300,100)
 bmi = st.sidebar.number_input("BMI", 10.0,50.0,25.0)
 
@@ -62,9 +62,9 @@ residence = st.sidebar.selectbox(
 
 # ---------------- ENCODING ---------------- #
 
-sex = 1 if sex=="Male" else 0
-married = 1 if married=="Yes" else 0
-residence = 1 if residence=="Urban" else 0
+sex_num = 1 if sex=="Male" else 0
+married_num = 1 if married=="Yes" else 0
+residence_num = 1 if residence=="Urban" else 0
 
 smoking_map={
     "never smoked":0,
@@ -79,73 +79,84 @@ work_map={
     "children":3
 }
 
-smoking=smoking_map[smoking]
-work=work_map[work]
+smoking_num = smoking_map[smoking]
+work_num = work_map[work]
 
-# ---------------- MODEL INPUTS ---------------- #
+# ---------------- HEART INPUT ---------------- #
 
 heart_input = np.array([[
-    age,sex,cp,trestbps,chol,fbs,
+    age,sex_num,cp,trestbps,chol,fbs,
     restecg,thalach,exang,oldpeak,
     slope,ca,thal
 ]])
 
-stroke_input = np.array([[
-    sex,age,hypertension,heart_disease,
-    married,work,residence,
-    glucose,bmi,smoking
-]])
+# ---------------- STROKE INPUT ---------------- #
+
+stroke_data = {
+    "gender":[sex],
+    "age":[age],
+    "hypertension":[hypertension],
+    "heart_disease":[heart_disease],
+    "ever_married":[married],
+    "work_type":[work],
+    "Residence_type":[residence],
+    "avg_glucose_level":[glucose],
+    "bmi":[bmi],
+    "smoking_status":[smoking]
+}
+
+stroke_df = pd.DataFrame(stroke_data)
+
+# convert categories to model format
+stroke_df = pd.get_dummies(stroke_df)
+
+# align columns with model
+try:
+    expected_cols = stroke_model.feature_names_in_
+    stroke_df = stroke_df.reindex(columns=expected_cols, fill_value=0)
+except:
+    pass
 
 # ---------------- BUTTONS ---------------- #
 
 col1,col2,col3 = st.columns(3)
 
 with col1:
-    heart_btn = st.button("Predict Heart Disease")
+    heart_btn = st.button("❤️ Predict Heart Disease")
 
 with col2:
-    stroke_btn = st.button("Predict Stroke")
+    stroke_btn = st.button("🧠 Predict Stroke")
 
 with col3:
-    both_btn = st.button("Predict Both")
+    both_btn = st.button("📊 Predict Both")
 
 # ---------------- HEART PREDICTION ---------------- #
 
 if heart_btn:
 
-    try:
+    st.subheader("Heart Disease Result")
 
-        pred = heart_model.predict(heart_input)[0]
-        prob = heart_model.predict_proba(heart_input)[0][1]
+    pred = heart_model.predict(heart_input)[0]
+    prob = heart_model.predict_proba(heart_input)[0][1]
 
-        st.subheader("Heart Disease Result")
-
-        if pred==1:
-            st.error(f"High Risk of Heart Disease ({prob*100:.1f}%)")
-        else:
-            st.success(f"Low Risk of Heart Disease ({prob*100:.1f}%)")
-
-    except:
-        st.error("Heart prediction failed. Check model input.")
+    if pred==1:
+        st.error(f"High Risk of Heart Disease ({prob*100:.1f}%)")
+    else:
+        st.success(f"Low Risk of Heart Disease ({prob*100:.1f}%)")
 
 # ---------------- STROKE PREDICTION ---------------- #
 
 if stroke_btn:
 
-    try:
+    st.subheader("Stroke Result")
 
-        pred = stroke_model.predict(stroke_input)[0]
-        prob = stroke_model.predict_proba(stroke_input)[0][1]
+    pred = stroke_model.predict(stroke_df)[0]
+    prob = stroke_model.predict_proba(stroke_df)[0][1]
 
-        st.subheader("Stroke Result")
-
-        if pred==1:
-            st.error(f"High Risk of Stroke ({prob*100:.1f}%)")
-        else:
-            st.success(f"Low Risk of Stroke ({prob*100:.1f}%)")
-
-    except:
-        st.error("Stroke prediction failed. Model input mismatch.")
+    if pred==1:
+        st.error(f"High Risk of Stroke ({prob*100:.1f}%)")
+    else:
+        st.success(f"Low Risk of Stroke ({prob*100:.1f}%)")
 
 # ---------------- BOTH PREDICTION ---------------- #
 
@@ -153,28 +164,20 @@ if both_btn:
 
     st.subheader("Overall Diagnosis")
 
-    try:
+    # HEART
+    heart_pred = heart_model.predict(heart_input)[0]
+    heart_prob = heart_model.predict_proba(heart_input)[0][1]
 
-        heart_pred = heart_model.predict(heart_input)[0]
-        heart_prob = heart_model.predict_proba(heart_input)[0][1]
+    if heart_pred==1:
+        st.error(f"Heart Disease Risk: {heart_prob*100:.1f}%")
+    else:
+        st.success(f"No Heart Disease ({heart_prob*100:.1f}%)")
 
-        if heart_pred==1:
-            st.error(f"Heart Disease Risk: {heart_prob*100:.1f}%")
-        else:
-            st.success(f"No Heart Disease ({heart_prob*100:.1f}%)")
+    # STROKE
+    stroke_pred = stroke_model.predict(stroke_df)[0]
+    stroke_prob = stroke_model.predict_proba(stroke_df)[0][1]
 
-    except:
-        st.warning("Heart model failed.")
-
-    try:
-
-        stroke_pred = stroke_model.predict(stroke_input)[0]
-        stroke_prob = stroke_model.predict_proba(stroke_input)[0][1]
-
-        if stroke_pred==1:
-            st.error(f"Stroke Risk: {stroke_prob*100:.1f}%")
-        else:
-            st.success(f"No Stroke Risk ({stroke_prob*100:.1f}%)")
-
-    except:
-        st.warning("Stroke model failed.")
+    if stroke_pred==1:
+        st.error(f"Stroke Risk: {stroke_prob*100:.1f}%")
+    else:
+        st.success(f"No Stroke Risk ({stroke_prob*100:.1f}%)")
