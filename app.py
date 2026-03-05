@@ -1,146 +1,115 @@
 import streamlit as st
 import numpy as np
 import joblib
-import plotly.graph_objects as go
-
-st.set_page_config(page_title="AI Health Risk Predictor", layout="wide")
-
-st.title("AI Heart Disease & Stroke Prediction System")
 
 # Load models
 heart_model = joblib.load("heart_model.pkl")
 stroke_model = joblib.load("stroke_model.pkl")
 
-# Layout
-left, right = st.columns([1,2])
+st.set_page_config(page_title="Medical Risk Prediction", layout="wide")
 
-with left:
+st.title("🩺 Heart Disease & Stroke Prediction System")
+
+st.write("Enter patient information to predict heart disease, stroke, or both.")
+
+# Layout (Left = Inputs, Right = Results)
+col1, col2 = st.columns([1,1])
+
+with col1:
 
     st.header("Patient Details")
 
-    age = st.number_input("Age",1,120)
+    age = st.number_input("Age", 1, 120)
 
-    sex = st.selectbox("Sex",["Male","Female"])
-    sex = 1 if sex=="Male" else 0
+    sex = st.selectbox("Sex", ["Male", "Female"])
+    sex = 1 if sex == "Male" else 0
 
-    cholesterol = st.number_input("Cholesterol")
+    cholesterol = st.number_input("Cholesterol Level")
 
     blood_pressure = st.number_input("Blood Pressure")
 
     glucose = st.number_input("Glucose Level")
 
-    st.divider()
+    st.write("")
 
-    heart_btn = st.button("Predict Heart Disease")
-    stroke_btn = st.button("Predict Stroke")
+    heart_btn = st.button("Predict Heart Disease ❤️")
+    stroke_btn = st.button("Predict Stroke 🧠")
     both_btn = st.button("Predict Both")
 
-# Gauge function
-def gauge(title,value):
+with col2:
 
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=value,
-        title={'text':title},
-        gauge={
-            'axis':{'range':[0,100]},
-            'steps':[
-                {'range':[0,30],'color':"green"},
-                {'range':[30,60],'color':"yellow"},
-                {'range':[60,100],'color':"red"}
-            ]
-        }
-    ))
+    st.header("Prediction Result")
 
-    st.plotly_chart(fig,use_container_width=True)
+    try:
 
-with right:
+        input_data = np.array([[age, sex, cholesterol, blood_pressure, glucose]])
 
-    st.header("Prediction Results")
+        # HEART PREDICTION
+        if heart_btn:
 
-    # HEART INPUT (13 features)
-    heart_input = np.array([[
+            pred = heart_model.predict(input_data)[0]
+            prob = heart_model.predict_proba(input_data)[0][1]
 
-        age,
-        sex,
-        0,              # cp
-        blood_pressure,
-        cholesterol,
-        0,              # fbs
-        0,              # restecg
-        150,            # thalach
-        0,              # exang
-        1.0,            # oldpeak
-        1,              # slope
-        0,              # ca
-        2               # thal
+            st.subheader("Heart Disease Result")
 
-    ]])
+            if pred == 1:
+                st.error("High Risk of Heart Disease")
+            else:
+                st.success("Low Risk of Heart Disease")
 
-    # STROKE INPUT
-    stroke_input = np.array([[
+            st.progress(int(prob * 100))
+            st.write(f"Risk Probability: **{prob*100:.2f}%**")
 
-        sex,
-        age,
-        0,              # hypertension
-        0,              # heart_disease
-        1,              # married
-        2,              # work_type
-        1,              # residence
-        glucose,
-        25,             # bmi
-        1               # smoking
 
-    ]])
+        # STROKE PREDICTION
+        if stroke_btn:
 
-    if heart_btn:
+            pred = stroke_model.predict(input_data)[0]
+            prob = stroke_model.predict_proba(input_data)[0][1]
 
-        prob = heart_model.predict_proba(heart_input)[0][1]
-        percent = round(prob*100,2)
+            st.subheader("Stroke Result")
 
-        gauge("Heart Disease Risk %",percent)
+            if pred == 1:
+                st.error("High Risk of Stroke")
+            else:
+                st.success("Low Risk of Stroke")
 
-        if percent > 50:
-            st.error("High Risk of Heart Disease")
-        else:
-            st.success("Low Risk of Heart Disease")
+            st.progress(int(prob * 100))
+            st.write(f"Risk Probability: **{prob*100:.2f}%**")
 
-    if stroke_btn:
 
-        prob = stroke_model.predict_proba(stroke_input)[0][1]
-        percent = round(prob*100,2)
+        # BOTH PREDICTION
+        if both_btn:
 
-        gauge("Stroke Risk %",percent)
+            st.subheader("Combined Prediction")
 
-        if percent > 50:
-            st.error("High Risk of Stroke")
-        else:
-            st.success("Low Risk of Stroke")
+            heart_pred = heart_model.predict(input_data)[0]
+            heart_prob = heart_model.predict_proba(input_data)[0][1]
 
-    if both_btn:
+            stroke_pred = stroke_model.predict(input_data)[0]
+            stroke_prob = stroke_model.predict_proba(input_data)[0][1]
 
-        heart_prob = heart_model.predict_proba(heart_input)[0][1]
-        stroke_prob = stroke_model.predict_proba(stroke_input)[0][1]
+            st.write("### Heart Disease")
 
-        heart_percent = round(heart_prob*100,2)
-        stroke_percent = round(stroke_prob*100,2)
+            if heart_pred == 1:
+                st.error("High Risk")
+            else:
+                st.success("Low Risk")
 
-        col1,col2 = st.columns(2)
+            st.progress(int(heart_prob * 100))
+            st.write(f"Probability: **{heart_prob*100:.2f}%**")
 
-        with col1:
-            gauge("Heart Risk %",heart_percent)
+            st.write("---")
 
-        with col2:
-            gauge("Stroke Risk %",stroke_percent)
+            st.write("### Stroke")
 
-        if heart_percent>50 and stroke_percent>50:
-            st.error("Patient at risk of BOTH Heart Disease and Stroke")
+            if stroke_pred == 1:
+                st.error("High Risk")
+            else:
+                st.success("Low Risk")
 
-        elif heart_percent>50:
-            st.warning("Patient likely has Heart Disease but not Stroke")
+            st.progress(int(stroke_prob * 100))
+            st.write(f"Probability: **{stroke_prob*100:.2f}%**")
 
-        elif stroke_percent>50:
-            st.warning("Patient likely has Stroke but not Heart Disease")
-
-        else:
-            st.success("Patient shows low risk for both diseases")
+    except:
+        st.warning("Input format does not match the models. Please check the data.")
