@@ -19,7 +19,7 @@ st.sidebar.header("Patient Details")
 
 # General
 age = st.sidebar.number_input("Age", 0, 120, 0)
-sex = st.sidebar.selectbox("Sex", ["Male", "Female"])
+sex_text = st.sidebar.selectbox("Sex", ["Male", "Female"])
 
 # Heart Disease Features
 cp = st.sidebar.slider("Chest Pain Type (cp)", 0, 3)
@@ -41,31 +41,29 @@ heart_disease = st.sidebar.selectbox("Existing Heart Disease", [0,1])
 glucose = st.sidebar.number_input("Glucose Level", 50,300,100)
 bmi = st.sidebar.number_input("BMI", 10.0,50.0,25.0)
 
-smoking = st.sidebar.selectbox(
+smoking_text = st.sidebar.selectbox(
     "Smoking Status",
     ["never smoked","formerly smoked","smokes"]
 )
 
-married = st.sidebar.selectbox(
+married_text = st.sidebar.selectbox(
     "Ever Married",
     ["Yes","No"]
 )
 
-work = st.sidebar.selectbox(
+work_text = st.sidebar.selectbox(
     "Work Type",
     ["Private","Self-employed","Govt_job","children"]
 )
 
-residence = st.sidebar.selectbox(
+residence_text = st.sidebar.selectbox(
     "Residence Type",
     ["Urban","Rural"]
 )
 
-# ---------------- ENCODING ---------------- #
+# ---------------- ENCODING FOR HEART MODEL ---------------- #
 
-sex = 1 if sex=="Male" else 0
-married = 1 if married=="Yes" else 0
-residence = 1 if residence=="Urban" else 0
+sex = 1 if sex_text=="Male" else 0
 
 smoking_map={
     "never smoked":0,
@@ -80,8 +78,11 @@ work_map={
     "children":3
 }
 
-smoking = smoking_map[smoking]
-work = work_map[work]
+married = 1 if married_text=="Yes" else 0
+residence = 1 if residence_text=="Urban" else 0
+
+smoking = smoking_map[smoking_text]
+work = work_map[work_text]
 
 # ---------------- MODEL INPUTS ---------------- #
 
@@ -92,19 +93,19 @@ heart_input = np.array([[
     slope,ca,thal
 ]])
 
-# STROKE MODEL INPUT (DATAFRAME FIX)
+# STROKE MODEL INPUT (TEXT FORMAT)
 stroke_input = pd.DataFrame({
 
-    "gender":[sex],
+    "gender":[sex_text],
     "age":[age],
     "hypertension":[hypertension],
     "heart_disease":[heart_disease],
-    "ever_married":[married],
-    "work_type":[work],
-    "Residence_type":[residence],
+    "ever_married":[married_text],
+    "work_type":[work_text],
+    "Residence_type":[residence_text],
     "avg_glucose_level":[glucose],
     "bmi":[bmi],
-    "smoking_status":[smoking]
+    "smoking_status":[smoking_text]
 
 })
 
@@ -137,7 +138,7 @@ if heart_btn:
         else:
             st.success(f"Low Risk of Heart Disease ({prob*100:.1f}%)")
 
-    except Exception as e:
+    except:
         st.error("Heart prediction failed")
 
 # ---------------- STROKE PREDICTION ---------------- #
@@ -156,7 +157,7 @@ if stroke_btn:
         else:
             st.success(f"No Stroke Risk ({prob*100:.1f}%)")
 
-    except Exception as e:
+    except:
         st.error("Stroke prediction failed")
 
 # ---------------- BOTH PREDICTION ---------------- #
