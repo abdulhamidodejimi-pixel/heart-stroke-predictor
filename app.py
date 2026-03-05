@@ -2,114 +2,138 @@ import streamlit as st
 import numpy as np
 import joblib
 
+st.set_page_config(page_title="Heart & Stroke Prediction", layout="wide")
+
 # Load models
 heart_model = joblib.load("heart_model.pkl")
 stroke_model = joblib.load("stroke_model.pkl")
 
-st.set_page_config(page_title="Medical Risk Prediction", layout="wide")
+st.title("🩺 AI Heart & Stroke Risk Prediction System")
 
-st.title("🩺 Heart Disease & Stroke Prediction System")
+st.write("Enter patient details on the left and select prediction type.")
 
-st.write("Enter patient information to predict heart disease, stroke, or both.")
+# SIDEBAR INPUTS
+st.sidebar.header("Patient Details")
 
-# Layout (Left = Inputs, Right = Results)
-col1, col2 = st.columns([1,1])
+age = st.sidebar.slider("Age", 1, 100, 30)
+sex = st.sidebar.selectbox("Sex", ["Male", "Female"])
+
+cp = st.sidebar.slider("Chest Pain Type (cp)", 0, 3)
+trestbps = st.sidebar.number_input("Resting Blood Pressure", 80, 200, 120)
+chol = st.sidebar.number_input("Cholesterol", 100, 400, 200)
+fbs = st.sidebar.selectbox("Fasting Blood Sugar >120", [0,1])
+restecg = st.sidebar.slider("Rest ECG", 0,2)
+thalach = st.sidebar.number_input("Max Heart Rate", 60,220,150)
+exang = st.sidebar.selectbox("Exercise Angina", [0,1])
+oldpeak = st.sidebar.slider("Oldpeak", 0.0,6.0,1.0)
+slope = st.sidebar.slider("Slope", 0,2)
+ca = st.sidebar.slider("Number of vessels (ca)", 0,4)
+thal = st.sidebar.slider("Thal", 0,3)
+
+# stroke features
+hypertension = st.sidebar.selectbox("Hypertension", [0,1])
+heart_disease = st.sidebar.selectbox("Existing Heart Disease", [0,1])
+glucose = st.sidebar.number_input("Glucose Level", 50,300,100)
+bmi = st.sidebar.number_input("BMI", 10.0,50.0,25.0)
+
+smoking = st.sidebar.selectbox("Smoking Status",
+["never smoked","formerly smoked","smokes"])
+
+married = st.sidebar.selectbox("Ever Married",
+["Yes","No"])
+
+work = st.sidebar.selectbox("Work Type",
+["Private","Self-employed","Govt_job","children"])
+
+residence = st.sidebar.selectbox("Residence Type",
+["Urban","Rural"])
+
+# encoding
+sex = 1 if sex=="Male" else 0
+married = 1 if married=="Yes" else 0
+residence = 1 if residence=="Urban" else 0
+
+smoking_map={
+"never smoked":0,
+"formerly smoked":1,
+"smokes":2
+}
+
+work_map={
+"Private":0,
+"Self-employed":1,
+"Govt_job":2,
+"children":3
+}
+
+smoking=smoking_map[smoking]
+work=work_map[work]
+
+# prediction buttons
+col1,col2,col3 = st.columns(3)
 
 with col1:
-
-    st.header("Patient Details")
-
-    age = st.number_input("Age", 1, 120)
-
-    sex = st.selectbox("Sex", ["Male", "Female"])
-    sex = 1 if sex == "Male" else 0
-
-    cholesterol = st.number_input("Cholesterol Level")
-
-    blood_pressure = st.number_input("Blood Pressure")
-
-    glucose = st.number_input("Glucose Level")
-
-    st.write("")
-
-    heart_btn = st.button("Predict Heart Disease ❤️")
-    stroke_btn = st.button("Predict Stroke 🧠")
-    both_btn = st.button("Predict Both")
+    heart_btn = st.button("Predict Heart Disease")
 
 with col2:
+    stroke_btn = st.button("Predict Stroke")
 
-    st.header("Prediction Result")
+with col3:
+    both_btn = st.button("Predict Both")
 
-    try:
+# HEART INPUT
+heart_input = np.array([[age,sex,cp,trestbps,chol,fbs,restecg,
+                         thalach,exang,oldpeak,slope,ca,thal]])
 
-        input_data = np.array([[age, sex, cholesterol, blood_pressure, glucose]])
+# STROKE INPUT
+stroke_input = np.array([[sex,age,hypertension,heart_disease,married,
+                          work,residence,glucose,bmi,smoking]])
 
-        # HEART PREDICTION
-        if heart_btn:
+# HEART PREDICTION
+if heart_btn:
 
-            pred = heart_model.predict(input_data)[0]
-            prob = heart_model.predict_proba(input_data)[0][1]
+    pred = heart_model.predict(heart_input)[0]
+    prob = heart_model.predict_proba(heart_input)[0][1]
 
-            st.subheader("Heart Disease Result")
+    st.subheader("Heart Disease Result")
 
-            if pred == 1:
-                st.error("High Risk of Heart Disease")
-            else:
-                st.success("Low Risk of Heart Disease")
-
-            st.progress(int(prob * 100))
-            st.write(f"Risk Probability: **{prob*100:.2f}%**")
-
-
-        # STROKE PREDICTION
-        if stroke_btn:
-
-            pred = stroke_model.predict(input_data)[0]
-            prob = stroke_model.predict_proba(input_data)[0][1]
-
-            st.subheader("Stroke Result")
-
-            if pred == 1:
-                st.error("High Risk of Stroke")
-            else:
-                st.success("Low Risk of Stroke")
-
-            st.progress(int(prob * 100))
-            st.write(f"Risk Probability: **{prob*100:.2f}%**")
+    if pred==1:
+        st.error(f"High Risk of Heart Disease ({prob*100:.1f}%)")
+    else:
+        st.success(f"Low Risk of Heart Disease ({prob*100:.1f}%)")
 
 
-        # BOTH PREDICTION
-        if both_btn:
+# STROKE PREDICTION
+if stroke_btn:
 
-            st.subheader("Combined Prediction")
+    pred = stroke_model.predict(stroke_input)[0]
+    prob = stroke_model.predict_proba(stroke_input)[0][1]
 
-            heart_pred = heart_model.predict(input_data)[0]
-            heart_prob = heart_model.predict_proba(input_data)[0][1]
+    st.subheader("Stroke Result")
 
-            stroke_pred = stroke_model.predict(input_data)[0]
-            stroke_prob = stroke_model.predict_proba(input_data)[0][1]
+    if pred==1:
+        st.error(f"High Risk of Stroke ({prob*100:.1f}%)")
+    else:
+        st.success(f"Low Risk of Stroke ({prob*100:.1f}%)")
 
-            st.write("### Heart Disease")
 
-            if heart_pred == 1:
-                st.error("High Risk")
-            else:
-                st.success("Low Risk")
+# BOTH
+if both_btn:
 
-            st.progress(int(heart_prob * 100))
-            st.write(f"Probability: **{heart_prob*100:.2f}%**")
+    heart_pred = heart_model.predict(heart_input)[0]
+    heart_prob = heart_model.predict_proba(heart_input)[0][1]
 
-            st.write("---")
+    stroke_pred = stroke_model.predict(stroke_input)[0]
+    stroke_prob = stroke_model.predict_proba(stroke_input)[0][1]
 
-            st.write("### Stroke")
+    st.subheader("Overall Diagnosis")
 
-            if stroke_pred == 1:
-                st.error("High Risk")
-            else:
-                st.success("Low Risk")
+    if heart_pred==1:
+        st.error(f"Heart Disease Risk: {heart_prob*100:.1f}%")
+    else:
+        st.success(f"No Heart Disease ({heart_prob*100:.1f}%)")
 
-            st.progress(int(stroke_prob * 100))
-            st.write(f"Probability: **{stroke_prob*100:.2f}%**")
-
-    except:
-        st.warning("Input format does not match the models. Please check the data.")
+    if stroke_pred==1:
+        st.error(f"Stroke Risk: {stroke_prob*100:.1f}%")
+    else:
+        st.success(f"No Stroke Risk ({stroke_prob*100:.1f}%)")
