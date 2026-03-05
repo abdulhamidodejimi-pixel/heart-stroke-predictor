@@ -1,68 +1,107 @@
 import streamlit as st
-import joblib
 import numpy as np
+import joblib
+import plotly.graph_objects as go
 
-st.set_page_config(
-    page_title="Heart & Stroke Prediction",
-    page_icon="❤️",
-    layout="wide"
-)
+# Load models
+heart_model = joblib.load("heart_model.pkl")
+stroke_model = joblib.load("stroke_model.pkl")
 
-st.title("❤️ Heart & Stroke Prediction App")
-st.markdown("AI-powered medical risk assessment system")
+st.set_page_config(page_title="Heart & Stroke Predictor", layout="centered")
 
-# Load models safely
-try:
-    heart_model = joblib.load("heart_model.pkl")
-    stroke_model = joblib.load("stroke_model.pkl")
-except:
-    st.error("Model files not found.")
-    st.stop()
+st.title("🫀 Heart Disease & Stroke Prediction System")
 
-# Sidebar inputs
-st.sidebar.header("Patient Information")
+st.write("Enter patient health details below to assess risk.")
 
-age = st.sidebar.number_input("Age", 1, 120, 30)
-sex = st.sidebar.selectbox("Sex", ["Male", "Female"])
-cholesterol = st.sidebar.number_input("Cholesterol Level", 0.0, 600.0, 200.0)
-blood_pressure = st.sidebar.number_input("Blood Pressure", 0.0, 300.0, 120.0)
-glucose = st.sidebar.number_input("Glucose Level", 0.0, 500.0, 100.0)
+# ----------------------------
+# USER INPUTS
+# ----------------------------
 
+age = st.number_input("Age", 1, 120)
+
+sex = st.selectbox("Sex", ["Male", "Female"])
 sex = 1 if sex == "Male" else 0
 
-input_data = np.array([[age, sex, cholesterol, blood_pressure, glucose]])
+chol = st.number_input("Cholesterol Level")
 
-st.subheader("Prediction Panel")
+trestbps = st.number_input("Resting Blood Pressure")
 
-col1, col2, col3 = st.columns(3)
+glucose = st.number_input("Glucose Level")
 
-with col1:
-    if st.button("Predict Heart"):
-        prediction = heart_model.predict(input_data)
-        if prediction[0] == 1:
+# Convert to model input
+input_data = np.array([[age, sex, chol, trestbps, glucose]])
+
+# ----------------------------
+# Prediction Button
+# ----------------------------
+
+if st.button("Predict Health Risk"):
+
+    try:
+
+        # HEART PREDICTION
+        heart_prob = heart_model.predict_proba(input_data)[0][1]
+        heart_percent = round(heart_prob * 100, 2)
+
+        # STROKE PREDICTION
+        stroke_prob = stroke_model.predict_proba(input_data)[0][1]
+        stroke_percent = round(stroke_prob * 100, 2)
+
+        # ----------------------------
+        # HEART RESULT
+        # ----------------------------
+
+        st.subheader("Heart Disease Risk")
+
+        heart_fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=heart_percent,
+            title={'text': "Heart Risk %"},
+            gauge={'axis': {'range': [0,100]}}
+        ))
+
+        st.plotly_chart(heart_fig)
+
+        if heart_percent > 50:
             st.error("High Risk of Heart Disease")
         else:
             st.success("Low Risk of Heart Disease")
 
-with col2:
-    if st.button("Predict Stroke"):
-        prediction = stroke_model.predict(input_data)
-        if prediction[0] == 1:
+        # ----------------------------
+        # STROKE RESULT
+        # ----------------------------
+
+        st.subheader("Stroke Risk")
+
+        stroke_fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=stroke_percent,
+            title={'text': "Stroke Risk %"},
+            gauge={'axis': {'range': [0,100]}}
+        ))
+
+        st.plotly_chart(stroke_fig)
+
+        if stroke_percent > 50:
             st.error("High Risk of Stroke")
         else:
             st.success("Low Risk of Stroke")
 
-with col3:
-    if st.button("Predict Both"):
-        heart_pred = heart_model.predict(input_data)
-        stroke_pred = stroke_model.predict(input_data)
+        # ----------------------------
+        # BOTH CONDITION CHECK
+        # ----------------------------
 
-        if heart_pred[0] == 1:
-            st.error("High Risk of Heart Disease")
-        else:
-            st.success("Low Risk of Heart Disease")
+        if heart_percent > 50 and stroke_percent > 50:
+            st.warning("Patient is at risk of BOTH Heart Disease and Stroke")
 
-        if stroke_pred[0] == 1:
-            st.error("High Risk of Stroke")
+        elif heart_percent > 50:
+            st.warning("Patient is mainly at risk of Heart Disease")
+
+        elif stroke_percent > 50:
+            st.warning("Patient is mainly at risk of Stroke")
+
         else:
-            st.success("Low Risk of Stroke")
+            st.info("Patient shows low risk for both conditions")
+
+    except Exception as e:
+        st.error("⚠️ Input format does not match model requirements.")
