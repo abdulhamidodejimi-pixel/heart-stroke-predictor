@@ -2,83 +2,84 @@ import streamlit as st
 import numpy as np
 import joblib
 
-# Load Models
+# -----------------------------
+# PAGE CONFIG
+# -----------------------------
+
+st.set_page_config(
+    page_title="AI Medical Diagnosis System",
+    page_icon="🩺",
+    layout="wide"
+)
+
+# -----------------------------
+# LOAD MODELS
+# -----------------------------
+
 heart_model = joblib.load("heart_model.pkl")
 stroke_model = joblib.load("stroke_model.pkl")
 
-st.set_page_config(page_title="AI Medical Diagnosis System", layout="wide")
-
-# ---------------------------
-# Custom UI Styling
-# ---------------------------
+# -----------------------------
+# CUSTOM UI STYLE
+# -----------------------------
 
 st.markdown("""
 <style>
 
-body {
-background-color:#f5f7fb;
-}
-
 .main-title{
-text-align:center;
-font-size:42px;
+font-size:40px;
 font-weight:700;
-color:#0a4da3;
+color:#0A4DA3;
+text-align:center;
 }
 
 .sub-title{
 text-align:center;
-font-size:18px;
-color:#6c757d;
-margin-bottom:25px;
+color:gray;
+margin-bottom:30px;
 }
 
 .card{
 background:white;
 padding:25px;
 border-radius:12px;
-box-shadow:0px 4px 12px rgba(0,0,0,0.08);
-margin-bottom:20px;
+box-shadow:0px 4px 15px rgba(0,0,0,0.08);
+margin-top:15px;
 }
 
-.metric{
-font-size:30px;
-font-weight:bold;
+.low{
+color:green;
+font-weight:600;
 }
 
-.low-risk{
-color:#2ecc71;
-font-weight:bold;
+.medium{
+color:orange;
+font-weight:600;
 }
 
-.medium-risk{
-color:#f39c12;
-font-weight:bold;
-}
-
-.high-risk{
-color:#e74c3c;
-font-weight:bold;
+.high{
+color:red;
+font-weight:600;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------------------
-# Header
-# ---------------------------
+# -----------------------------
+# HEADER
+# -----------------------------
 
-st.markdown('<p class="main-title">🩺 AI Medical Diagnosis System</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">Stroke & Heart Disease Prediction using Machine Learning</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-title">AI Medical Diagnosis System</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">Stroke & Heart Disease Risk Prediction using Machine Learning</p>', unsafe_allow_html=True)
 
-# ---------------------------
-# Sidebar
-# ---------------------------
+# -----------------------------
+# SIDEBAR
+# -----------------------------
 
-st.sidebar.title("Medical AI System")
+st.sidebar.title("Navigation")
 
-option = st.sidebar.radio(
-"Select Diagnosis",
+menu = st.sidebar.radio(
+"Select Service",
 [
 "Stroke Prediction",
 "Heart Disease Prediction",
@@ -90,85 +91,90 @@ st.sidebar.markdown("---")
 
 st.sidebar.info(
 """
+AI Medical System
+
 This system predicts:
 
 • Stroke Risk  
 • Heart Disease Risk  
 • Combined Diagnosis  
 
-Built using Machine Learning.
+Using trained Machine Learning models.
 """
 )
 
-# ---------------------------
-# Risk Level Function
-# ---------------------------
+# -----------------------------
+# RISK LEVEL FUNCTION
+# -----------------------------
 
 def risk_level(prob):
 
     if prob < 30:
-        return "Low Risk", "low-risk"
+        return "Low Risk","low"
+
     elif prob < 60:
-        return "Moderate Risk", "medium-risk"
+        return "Moderate Risk","medium"
+
     else:
-        return "High Risk", "high-risk"
+        return "High Risk","high"
 
 
 # =====================================================
 # STROKE PREDICTION
 # =====================================================
 
-if option == "Stroke Prediction":
+if menu == "Stroke Prediction":
 
     st.header("Stroke Risk Prediction")
 
     with st.form("stroke_form"):
 
-        col1, col2 = st.columns(2)
+        col1,col2 = st.columns(2)
 
         with col1:
-            age = st.number_input("Age", min_value=1, max_value=120)
-            hypertension = st.selectbox("Hypertension", ["Select",0,1])
-            heart_disease = st.selectbox("Existing Heart Disease", ["Select",0,1])
+            age = st.number_input("Age",1,120)
+            hypertension = st.selectbox("Hypertension",[None,0,1])
+            heart_disease = st.selectbox("Existing Heart Disease",[None,0,1])
 
         with col2:
             glucose = st.number_input("Average Glucose Level")
             bmi = st.number_input("BMI")
 
-        submit = st.form_submit_button("Predict Stroke")
+        submit = st.form_submit_button("Predict Stroke Risk")
 
     if submit:
 
-        if hypertension == "Select" or heart_disease == "Select" or glucose == 0 or bmi == 0:
+        if None in [hypertension,heart_disease] or glucose==0 or bmi==0:
 
-            st.warning("Please enter all patient details before prediction.")
+            st.warning("Please fill all patient information.")
 
         else:
 
-            data = np.array([[age, hypertension, heart_disease, glucose, bmi]])
+            data = np.array([[age,hypertension,heart_disease,glucose,bmi]])
 
             prediction = stroke_model.predict(data)
-            probability = stroke_model.predict_proba(data)[0][1] * 100
+            probability = stroke_model.predict_proba(data)[0][1]*100
 
-            risk, style = risk_level(probability)
+            level,style = risk_level(probability)
 
-            st.markdown("### Diagnosis Result")
+            st.subheader("Diagnosis Result")
 
             st.progress(int(probability))
 
             st.markdown(f"""
             <div class="card">
-            <p class="metric">{probability:.2f}%</p>
-            <p class="{style}">{risk}</p>
+            <h3>Stroke Risk Probability</h3>
+            <h1>{probability:.2f}%</h1>
+            <p class="{style}">{level}</p>
             </div>
-            """, unsafe_allow_html=True)
+            """,unsafe_allow_html=True)
 
-            if prediction[0] == 1:
+            if prediction[0]==1:
                 st.error("Patient is likely to have Stroke")
             else:
                 st.success("No Stroke Detected")
 
-            st.markdown("### Patient Summary")
+            st.subheader("Patient Summary")
 
             c1,c2 = st.columns(2)
 
@@ -185,9 +191,9 @@ if option == "Stroke Prediction":
 # HEART DISEASE PREDICTION
 # =====================================================
 
-elif option == "Heart Disease Prediction":
+elif menu == "Heart Disease Prediction":
 
-    st.header("Heart Disease Prediction")
+    st.header("Heart Disease Risk Prediction")
 
     with st.form("heart_form"):
 
@@ -195,30 +201,30 @@ elif option == "Heart Disease Prediction":
 
         with col1:
             age = st.number_input("Age")
-            sex = st.selectbox("Sex", ["Select",0,1])
-            cp = st.selectbox("Chest Pain Type", ["Select",0,1,2,3])
+            sex = st.selectbox("Sex",[None,0,1])
+            cp = st.selectbox("Chest Pain Type",[None,0,1,2,3])
             trestbps = st.number_input("Resting Blood Pressure")
 
         with col2:
             chol = st.number_input("Cholesterol")
-            fbs = st.selectbox("Fasting Blood Sugar >120", ["Select",0,1])
-            restecg = st.selectbox("Rest ECG", ["Select",0,1,2])
-            thalach = st.number_input("Maximum Heart Rate")
+            fbs = st.selectbox("Fasting Blood Sugar",[None,0,1])
+            restecg = st.selectbox("Rest ECG",[None,0,1,2])
+            thalach = st.number_input("Max Heart Rate")
 
         with col3:
-            exang = st.selectbox("Exercise Induced Angina", ["Select",0,1])
+            exang = st.selectbox("Exercise Induced Angina",[None,0,1])
             oldpeak = st.number_input("Old Peak")
-            slope = st.selectbox("Slope", ["Select",0,1,2])
-            ca = st.selectbox("Major Vessels", ["Select",0,1,2,3])
-            thal = st.selectbox("Thal", ["Select",0,1,2,3])
+            slope = st.selectbox("Slope",[None,0,1,2])
+            ca = st.selectbox("Major Vessels",[None,0,1,2,3])
+            thal = st.selectbox("Thal",[None,0,1,2,3])
 
         submit = st.form_submit_button("Predict Heart Disease")
 
     if submit:
 
-        if "Select" in [sex,cp,fbs,restecg,exang,slope,ca,thal] or chol==0 or trestbps==0:
+        if None in [sex,cp,fbs,restecg,exang,slope,ca,thal] or chol==0 or trestbps==0:
 
-            st.warning("Please fill all patient details.")
+            st.warning("Please fill all patient information.")
 
         else:
 
@@ -228,18 +234,19 @@ elif option == "Heart Disease Prediction":
             prediction = heart_model.predict(data)
             probability = heart_model.predict_proba(data)[0][1]*100
 
-            risk, style = risk_level(probability)
+            level,style = risk_level(probability)
 
-            st.markdown("### Diagnosis Result")
+            st.subheader("Diagnosis Result")
 
             st.progress(int(probability))
 
             st.markdown(f"""
             <div class="card">
-            <p class="metric">{probability:.2f}%</p>
-            <p class="{style}">{risk}</p>
+            <h3>Heart Disease Risk</h3>
+            <h1>{probability:.2f}%</h1>
+            <p class="{style}">{level}</p>
             </div>
-            """, unsafe_allow_html=True)
+            """,unsafe_allow_html=True)
 
             if prediction[0]==1:
                 st.error("Patient likely has Heart Disease")
@@ -248,7 +255,7 @@ elif option == "Heart Disease Prediction":
 
 
 # =====================================================
-# FULL HEALTH DIAGNOSIS
+# FULL DIAGNOSIS
 # =====================================================
 
 else:
@@ -258,17 +265,17 @@ else:
     with st.form("full_form"):
 
         age = st.number_input("Age")
-        hypertension = st.selectbox("Hypertension", ["Select",0,1])
+        hypertension = st.selectbox("Hypertension",[None,0,1])
         glucose = st.number_input("Average Glucose Level")
         bmi = st.number_input("BMI")
 
-        submit = st.form_submit_button("Run Diagnosis")
+        submit = st.form_submit_button("Run Full Diagnosis")
 
     if submit:
 
-        if hypertension=="Select" or glucose==0 or bmi==0:
+        if None in [hypertension] or glucose==0 or bmi==0:
 
-            st.warning("Please fill all patient details.")
+            st.warning("Please complete patient details.")
 
         else:
 
@@ -282,7 +289,7 @@ else:
             heart_prob = heart_model.predict_proba(heart_data)[0][1]*100
             heart_pred = heart_model.predict(heart_data)
 
-            st.markdown("### Final Diagnosis")
+            st.subheader("Final Diagnosis")
 
             st.write(f"Stroke Risk: {stroke_prob:.2f}%")
             st.write(f"Heart Disease Risk: {heart_prob:.2f}%")
@@ -304,9 +311,9 @@ else:
                 st.success("No Stroke or Heart Disease Detected")
 
 
-# ---------------------------
-# Footer
-# ---------------------------
+# -----------------------------
+# FOOTER
+# -----------------------------
 
 st.markdown("---")
 
@@ -317,7 +324,7 @@ st.markdown(
 AI Medical Diagnosis System  
 Machine Learning Project  
 
-Built with Streamlit & Scikit-Learn
+Built with Streamlit
 
 </center>
 """,
