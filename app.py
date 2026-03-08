@@ -4,171 +4,145 @@ import pickle
 import plotly.graph_objects as go
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
-import tempfile
+import io
+import os
+
+st.set_page_config(page_title="AI Heart & Stroke Predictor", layout="wide")
 
 # -----------------------------
-# PAGE CONFIG
+# LOAD MODELS SAFELY
 # -----------------------------
-st.set_page_config(
-    page_title="AI Medical Risk Predictor",
-    page_icon="🩺",
-    layout="wide"
-)
+def load_model(file):
+    if not os.path.exists(file):
+        st.error(f"Model file '{file}' not found. Upload it to your GitHub repository.")
+        return None
+    try:
+        with open(file, "rb") as f:
+            return pickle.load(f)
+    except Exception as e:
+        st.error(f"Error loading {file}: {e}")
+        return None
 
-st.title("🧠 AI Stroke & Heart Disease Prediction System")
-st.markdown("### Intelligent Medical Risk Assessment Platform")
+heart_model = load_model("heart_model.pkl")
+stroke_model = load_model("stroke_model.pkl")
 
 # -----------------------------
-# LOAD MODELS
+# TITLE
 # -----------------------------
-stroke_model = pickle.load(open("stroke_model.pkl", "rb"))
-heart_model = pickle.load(open("heart_model.pkl", "rb"))
+st.title("🩺 AI Heart & Stroke Risk Prediction System")
+st.markdown("Professional AI medical risk assessment system.")
 
 # -----------------------------
 # PATIENT DETAILS
 # -----------------------------
 st.sidebar.header("Patient Details")
 
-age = st.sidebar.number_input("Age", 1, 120)
-hypertension = st.sidebar.selectbox("Hypertension", [0,1])
-heart_disease_input = st.sidebar.selectbox("Previous Heart Disease", [0,1])
-glucose = st.sidebar.number_input("Glucose Level")
-bmi = st.sidebar.number_input("BMI")
-
-sex = st.sidebar.selectbox("Sex", [0,1])
-cp = st.sidebar.selectbox("Chest Pain Type", [0,1,2,3])
+age = st.sidebar.number_input("Age", min_value=0, max_value=120)
+sex = st.sidebar.selectbox("Sex", ["Male", "Female"])
+cp = st.sidebar.number_input("Chest Pain Type", min_value=0, max_value=3)
+trestbps = st.sidebar.number_input("Resting Blood Pressure")
 chol = st.sidebar.number_input("Cholesterol")
+fbs = st.sidebar.number_input("Fasting Blood Sugar")
 thalach = st.sidebar.number_input("Max Heart Rate")
+oldpeak = st.sidebar.number_input("ST Depression")
 
-predict_btn = st.sidebar.button("Predict Disease")
+predict_btn = st.sidebar.button("Predict Risk")
 
 # -----------------------------
-# FUNCTIONS
+# RISK GAUGE
 # -----------------------------
-
-def gauge_chart(value, title):
-
+def risk_gauge(value, title):
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=value,
         title={'text': title},
         gauge={
-            'axis': {'range':[0,100]},
-            'bar': {'color':"red"},
-            'steps':[
-                {'range':[0,30],'color':"green"},
-                {'range':[30,60],'color':"yellow"},
-                {'range':[60,100],'color':"red"}
-            ],
+            'axis': {'range': [0, 100]},
         }
     ))
+    st.plotly_chart(fig, use_container_width=True)
 
-    return fig
-
-
-def generate_explanation(age, bmi, glucose):
-
-    explanation = []
-
-    if age > 55:
-        explanation.append("Advanced age increases cardiovascular risk.")
-
-    if bmi > 30:
-        explanation.append("High BMI indicates obesity risk.")
-
-    if glucose > 140:
-        explanation.append("High glucose suggests diabetes risk.")
-
-    if len(explanation) == 0:
-        explanation.append("No major risk factors detected.")
-
-    return explanation
-
-
-def generate_pdf(stroke_risk, heart_risk):
+# -----------------------------
+# PDF REPORT
+# -----------------------------
+def generate_pdf(heart_result, stroke_result):
+    buffer = io.BytesIO()
 
     styles = getSampleStyleSheet()
 
-    temp = tempfile.NamedTemporaryFile(delete=False)
+    story = []
+    story.append(Paragraph("AI Medical Prediction Report", styles['Title']))
+    story.append(Spacer(1,20))
 
-    doc = SimpleDocTemplate(temp.name)
+    story.append(Paragraph(f"Heart Disease Risk: {heart_result}", styles['Normal']))
+    story.append(Paragraph(f"Stroke Risk: {stroke_result}", styles['Normal']))
 
-    elements = []
+    doc = SimpleDocTemplate(buffer)
+    doc.build(story)
 
-    elements.append(Paragraph("AI Medical Risk Report", styles['Title']))
-    elements.append(Spacer(1,20))
-
-    elements.append(Paragraph(f"Stroke Risk: {stroke_risk:.2f}%", styles['Normal']))
-    elements.append(Paragraph(f"Heart Disease Risk: {heart_risk:.2f}%", styles['Normal']))
-
-    doc.build(elements)
-
-    return temp.name
+    buffer.seek(0)
+    return buffer
 
 # -----------------------------
 # PREDICTION
 # -----------------------------
-
 if predict_btn:
 
-    stroke_data = np.array([[age, hypertension, heart_disease_input, glucose, bmi]])
-    heart_data = np.array([[age, sex, cp, chol, thalach]])
+    if heart_model is None or stroke_model is None:
+        st.error("Models not loaded. Check GitHub files.")
+        st.stop()
 
-    stroke_prob = stroke_model.predict_proba(stroke_data)[0][1] * 100
-    heart_prob = heart_model.predict_proba(heart_data)[0][1] * 100
+    if age == 0 or trestbps == 0 or chol == 0:
+        st.warning("Please fill patient details before prediction.")
+        st.stop()
+
+    sex_val = 1 if sex == "Male" else 0
+
+    heart_features = np.array([[age, sex_val, cp, trestbps, chol, fbs, thalach, oldpeak]])
+
+    try:
+        heart_pred = heart_model.predict(heart_features)[0]
+        heart_prob = heart_model.predict_proba(heart_features)[0][1]*100
+    except:
+        heart_pred = 0
+        heart_prob = 0
+
+    try:
+        stroke_pred = stroke_model.predict(heart_features)[0]
+        stroke_prob = stroke_model.predict_proba(heart_features)[0][1]*100
+    except:
+        stroke_pred = 0
+        stroke_prob = 0
+
+    st.subheader("Prediction Results")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("Stroke Risk")
-        st.plotly_chart(gauge_chart(stroke_prob,"Stroke Risk %"))
+        risk_gauge(heart_prob, "Heart Disease Risk %")
 
     with col2:
-        st.subheader("Heart Disease Risk")
-        st.plotly_chart(gauge_chart(heart_prob,"Heart Disease Risk %"))
+        risk_gauge(stroke_prob, "Stroke Risk %")
 
-    # -----------------------------
-    # FINAL RESULT
-    # -----------------------------
+    # AI explanation
+    st.subheader("AI Explanation")
 
-    st.header("Diagnosis")
-
-    if stroke_prob > 50 and heart_prob > 50:
-        st.error("⚠ Patient is at risk of BOTH Stroke and Heart Disease")
-
-    elif stroke_prob > 50:
-        st.warning("⚠ Patient is at risk of Stroke")
-
-    elif heart_prob > 50:
-        st.warning("⚠ Patient is at risk of Heart Disease")
-
+    if heart_pred == 1:
+        st.error("The model detected signs associated with heart disease risk.")
     else:
-        st.success("✅ Patient has low risk")
+        st.success("Low heart disease risk detected.")
 
-    # -----------------------------
-    # AI EXPLANATION
-    # -----------------------------
+    if stroke_pred == 1:
+        st.error("The model detected stroke risk factors.")
+    else:
+        st.success("Low stroke risk detected.")
 
-    st.header("AI Explanation")
+    # PDF download
+    pdf = generate_pdf(heart_prob, stroke_prob)
 
-    explanation = generate_explanation(age,bmi,glucose)
-
-    for e in explanation:
-        st.write("•", e)
-
-    # -----------------------------
-    # PDF REPORT
-    # -----------------------------
-
-    st.header("Download Medical Report")
-
-    pdf_file = generate_pdf(stroke_prob, heart_prob)
-
-    with open(pdf_file,"rb") as f:
-
-        st.download_button(
-            label="Download Patient Report",
-            data=f,
-            file_name="medical_report.pdf",
-            mime="application/pdf"
-        )
+    st.download_button(
+        label="Download Medical Report (PDF)",
+        data=pdf,
+        file_name="medical_report.pdf",
+        mime="application/pdf"
+    )
