@@ -9,15 +9,11 @@ stroke_model = joblib.load("stroke_model.pkl")
 st.set_page_config(page_title="AI Health Risk Prediction System", layout="wide")
 
 # ---------------------------
-# UI Styling
+# Styling
 # ---------------------------
 
 st.markdown("""
 <style>
-.main {
-background-color:#f4f6fb;
-}
-
 .title {
 text-align:center;
 font-size:40px;
@@ -30,24 +26,23 @@ text-align:center;
 font-size:18px;
 color:gray;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown('<p class="title">AI Health Risk Prediction System</p>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">Stroke and Heart Disease Prediction</p>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">Stroke and Heart Disease Diagnosis</p>', unsafe_allow_html=True)
 
 st.write("")
 
-# Sidebar
+# Sidebar navigation
 option = st.sidebar.selectbox(
-"Choose Diagnosis",
-["Stroke Prediction", "Heart Disease Prediction", "Full Health Diagnosis"]
+    "Choose Diagnosis",
+    ["Stroke Prediction", "Heart Disease Prediction", "Full Health Diagnosis"]
 )
 
-# -----------------------------------
+# =====================================================
 # STROKE PREDICTION
-# -----------------------------------
+# =====================================================
 
 if option == "Stroke Prediction":
 
@@ -113,9 +108,9 @@ if option == "Stroke Prediction":
                 st.write("No major risk factors detected.")
 
 
-# -----------------------------------
-# HEART DISEASE
-# -----------------------------------
+# =====================================================
+# HEART DISEASE PREDICTION
+# =====================================================
 
 elif option == "Heart Disease Prediction":
 
@@ -190,9 +185,9 @@ elif option == "Heart Disease Prediction":
                     st.write("•", c)
 
 
-# -----------------------------------
-# FULL DIAGNOSIS
-# -----------------------------------
+# =====================================================
+# FULL HEALTH DIAGNOSIS
+# =====================================================
 
 else:
 
@@ -200,49 +195,75 @@ else:
 
     with st.form("full_form"):
 
-        age = st.number_input("Age")
+        st.subheader("Heart Disease Information")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            age = st.number_input("Age")
+            sex = st.selectbox("Sex", ["Select",0,1])
+            cp = st.selectbox("Chest Pain Type", ["Select",0,1,2,3])
+            trestbps = st.number_input("Resting Blood Pressure")
+
+        with col2:
+            chol = st.number_input("Cholesterol")
+            fbs = st.selectbox("Fasting Blood Sugar >120", ["Select",0,1])
+            restecg = st.selectbox("Rest ECG", ["Select",0,1,2])
+            thalach = st.number_input("Maximum Heart Rate")
+
+        with col3:
+            exang = st.selectbox("Exercise Induced Angina", ["Select",0,1])
+            oldpeak = st.number_input("Old Peak")
+            slope = st.selectbox("Slope", ["Select",0,1,2])
+            ca = st.selectbox("Major Vessels", ["Select",0,1,2,3])
+            thal = st.selectbox("Thal", ["Select",0,1,2,3])
+
+        st.subheader("Stroke Related Information")
+
         hypertension = st.selectbox("Hypertension", ["Select",0,1])
         glucose = st.number_input("Average Glucose Level")
         bmi = st.number_input("BMI")
 
-        submit = st.form_submit_button("Run Diagnosis")
+        submit = st.form_submit_button("Run Full Diagnosis")
 
     if submit:
 
-        if hypertension == "Select" or glucose == 0 or bmi == 0:
+        if "Select" in [sex,cp,fbs,restecg,exang,slope,ca,thal,hypertension] or chol==0 or trestbps==0 or glucose==0 or bmi==0:
 
-            st.warning("⚠ Please fill all patient details.")
+            st.warning("⚠ Please fill all patient details before prediction.")
 
         else:
 
-            stroke_data = np.array([[age,hypertension,0,glucose,bmi]])
-            stroke_prob = stroke_model.predict_proba(stroke_data)[0][1]*100
-            stroke_pred = stroke_model.predict(stroke_data)
+            # Heart prediction
+            heart_data = np.array([[age,sex,cp,trestbps,chol,fbs,restecg,
+                                    thalach,exang,oldpeak,slope,ca,thal]])
 
-            heart_data = np.array([[age,1,1,120,200,0,1,150,0,1,1,0,2]])
-            heart_prob = heart_model.predict_proba(heart_data)[0][1]*100
             heart_pred = heart_model.predict(heart_data)
+            heart_prob = heart_model.predict_proba(heart_data)[0][1]*100
+
+            # Stroke prediction
+            stroke_data = np.array([[age,hypertension,heart_pred[0],glucose,bmi]])
+
+            stroke_pred = stroke_model.predict(stroke_data)
+            stroke_prob = stroke_model.predict_proba(stroke_data)[0][1]*100
 
             st.subheader("Final Diagnosis")
 
+            st.write(f"Stroke Risk: {stroke_prob:.2f}%")
+            st.write(f"Heart Disease Risk: {heart_prob:.2f}%")
+
             if stroke_pred[0]==1 and heart_pred[0]==1:
 
-                st.error("Patient may have BOTH Stroke and Heart Disease")
-                st.write(f"Stroke Risk: {stroke_prob:.2f}%")
-                st.write(f"Heart Disease Risk: {heart_prob:.2f}%")
+                st.error("⚠ Patient may have BOTH Stroke and Heart Disease")
 
             elif stroke_pred[0]==1:
 
-                st.warning("Patient may have Stroke Only")
-                st.write(f"Stroke Risk: {stroke_prob:.2f}%")
+                st.warning("⚠ Patient may have Stroke Only")
 
             elif heart_pred[0]==1:
 
-                st.warning("Patient may have Heart Disease Only")
-                st.write(f"Heart Disease Risk: {heart_prob:.2f}%")
+                st.warning("⚠ Patient may have Heart Disease Only")
 
             else:
 
-                st.success("No Stroke or Heart Disease Detected")
-                st.write(f"Stroke Risk: {stroke_prob:.2f}%")
-                st.write(f"Heart Disease Risk: {heart_prob:.2f}%")
+                st.success("✅ No Stroke or Heart Disease Detected")
