@@ -1,239 +1,174 @@
 import streamlit as st
 import numpy as np
-import joblib
-import pandas as pd
+import pickle
 import plotly.graph_objects as go
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
+import tempfile
 
 # -----------------------------
 # PAGE CONFIG
 # -----------------------------
-st.set_page_config(page_title="AI Medical Diagnosis System", page_icon="🩺", layout="wide")
+st.set_page_config(
+    page_title="AI Medical Risk Predictor",
+    page_icon="🩺",
+    layout="wide"
+)
+
+st.title("🧠 AI Stroke & Heart Disease Prediction System")
+st.markdown("### Intelligent Medical Risk Assessment Platform")
 
 # -----------------------------
 # LOAD MODELS
 # -----------------------------
-heart_model = joblib.load("heart_model.pkl")
-stroke_model = joblib.load("stroke_model.pkl")
-
-# -----------------------------
-# HEADER
-# -----------------------------
-st.title("🩺 AI Medical Diagnosis System")
-st.write("Machine Learning System for Stroke & Heart Disease Risk Prediction")
-
-# -----------------------------
-# SIDEBAR NAVIGATION
-# -----------------------------
-st.sidebar.title("Patient Menu")
-
-menu = st.sidebar.radio(
-"Select Section",
-[
-"Patient Details",
-"Stroke Prediction",
-"Heart Disease Prediction",
-"Full Diagnosis"
-]
-)
+stroke_model = pickle.load(open("stroke_model.pkl", "rb"))
+heart_model = pickle.load(open("heart_model.pkl", "rb"))
 
 # -----------------------------
 # PATIENT DETAILS
 # -----------------------------
-if menu == "Patient Details":
+st.sidebar.header("Patient Details")
 
-    st.header("Patient Information")
+age = st.sidebar.number_input("Age", 1, 120)
+hypertension = st.sidebar.selectbox("Hypertension", [0,1])
+heart_disease_input = st.sidebar.selectbox("Previous Heart Disease", [0,1])
+glucose = st.sidebar.number_input("Glucose Level")
+bmi = st.sidebar.number_input("BMI")
 
-    col1,col2 = st.columns(2)
+sex = st.sidebar.selectbox("Sex", [0,1])
+cp = st.sidebar.selectbox("Chest Pain Type", [0,1,2,3])
+chol = st.sidebar.number_input("Cholesterol")
+thalach = st.sidebar.number_input("Max Heart Rate")
 
-    with col1:
-        name = st.text_input("Patient Name")
-        age = st.number_input("Age",1,120)
-
-    with col2:
-        gender = st.selectbox("Gender",["Male","Female"])
-        bmi = st.number_input("BMI")
-
-    st.success("Patient information recorded")
+predict_btn = st.sidebar.button("Predict Disease")
 
 # -----------------------------
-# RISK GAUGE FUNCTION
+# FUNCTIONS
 # -----------------------------
-def gauge_chart(probability):
+
+def gauge_chart(value, title):
 
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
-        value=probability,
-        title={'text': "Risk Level (%)"},
+        value=value,
+        title={'text': title},
         gauge={
-            'axis': {'range': [0,100]},
+            'axis': {'range':[0,100]},
+            'bar': {'color':"red"},
             'steps':[
                 {'range':[0,30],'color':"green"},
-                {'range':[30,60],'color':"orange"},
+                {'range':[30,60],'color':"yellow"},
                 {'range':[60,100],'color':"red"}
-            ]
+            ],
         }
     ))
 
-    st.plotly_chart(fig,use_container_width=True)
+    return fig
+
+
+def generate_explanation(age, bmi, glucose):
+
+    explanation = []
+
+    if age > 55:
+        explanation.append("Advanced age increases cardiovascular risk.")
+
+    if bmi > 30:
+        explanation.append("High BMI indicates obesity risk.")
+
+    if glucose > 140:
+        explanation.append("High glucose suggests diabetes risk.")
+
+    if len(explanation) == 0:
+        explanation.append("No major risk factors detected.")
+
+    return explanation
+
+
+def generate_pdf(stroke_risk, heart_risk):
+
+    styles = getSampleStyleSheet()
+
+    temp = tempfile.NamedTemporaryFile(delete=False)
+
+    doc = SimpleDocTemplate(temp.name)
+
+    elements = []
+
+    elements.append(Paragraph("AI Medical Risk Report", styles['Title']))
+    elements.append(Spacer(1,20))
+
+    elements.append(Paragraph(f"Stroke Risk: {stroke_risk:.2f}%", styles['Normal']))
+    elements.append(Paragraph(f"Heart Disease Risk: {heart_risk:.2f}%", styles['Normal']))
+
+    doc.build(elements)
+
+    return temp.name
 
 # -----------------------------
-# AI EXPLANATION
+# PREDICTION
 # -----------------------------
-def explain_prediction(model,feature_names,input_data):
 
-    importances = model.feature_importances_
+if predict_btn:
 
-    df = pd.DataFrame({
-        "Feature":feature_names,
-        "Importance":importances
-    })
+    stroke_data = np.array([[age, hypertension, heart_disease_input, glucose, bmi]])
+    heart_data = np.array([[age, sex, cp, chol, thalach]])
 
-    df = df.sort_values("Importance",ascending=False)
+    stroke_prob = stroke_model.predict_proba(stroke_data)[0][1] * 100
+    heart_prob = heart_model.predict_proba(heart_data)[0][1] * 100
 
-    st.subheader("AI Explanation (Top Influencing Factors)")
-    st.bar_chart(df.set_index("Feature"))
+    col1, col2 = st.columns(2)
 
-# =====================================================
-# STROKE PREDICTION
-# =====================================================
-elif menu == "Stroke Prediction":
-
-    st.header("Stroke Risk Prediction")
-
-    age = st.number_input("Age",1,120)
-    hypertension = st.selectbox("Hypertension",[0,1])
-    heart_disease = st.selectbox("Heart Disease",[0,1])
-    glucose = st.number_input("Average Glucose Level")
-    bmi = st.number_input("BMI")
-
-    if st.button("Predict Stroke"):
-
-        data = np.array([[age,hypertension,heart_disease,glucose,bmi]])
-
-        pred = stroke_model.predict(data)
-        prob = stroke_model.predict_proba(data)[0][1]*100
-
-        st.subheader("Stroke Risk Gauge")
-        gauge_chart(prob)
-
-        if pred[0]==1:
-            st.error("Patient likely at risk of Stroke")
-        else:
-            st.success("Low Stroke Risk")
-
-        explain_prediction(
-            stroke_model,
-            ["Age","Hypertension","Heart Disease","Glucose","BMI"],
-            data
-        )
-
-# =====================================================
-# HEART DISEASE PREDICTION
-# =====================================================
-elif menu == "Heart Disease Prediction":
-
-    st.header("Heart Disease Prediction")
-
-    age = st.number_input("Age")
-    sex = st.selectbox("Sex",[0,1])
-    cp = st.selectbox("Chest Pain Type",[0,1,2,3])
-    trestbps = st.number_input("Resting BP")
-    chol = st.number_input("Cholesterol")
-    fbs = st.selectbox("Fasting Blood Sugar",[0,1])
-    restecg = st.selectbox("Rest ECG",[0,1,2])
-    thalach = st.number_input("Max Heart Rate")
-    exang = st.selectbox("Exercise Angina",[0,1])
-    oldpeak = st.number_input("Old Peak")
-    slope = st.selectbox("Slope",[0,1,2])
-    ca = st.selectbox("Major Vessels",[0,1,2,3])
-    thal = st.selectbox("Thal",[0,1,2,3])
-
-    if st.button("Predict Heart Disease"):
-
-        data = np.array([[age,sex,cp,trestbps,chol,fbs,restecg,
-                          thalach,exang,oldpeak,slope,ca,thal]])
-
-        pred = heart_model.predict(data)
-        prob = heart_model.predict_proba(data)[0][1]*100
-
-        st.subheader("Heart Disease Risk Gauge")
-        gauge_chart(prob)
-
-        if pred[0]==1:
-            st.error("Patient likely has Heart Disease")
-        else:
-            st.success("Low Heart Disease Risk")
-
-        explain_prediction(
-            heart_model,
-            ["Age","Sex","ChestPain","BP","Cholesterol","FBS",
-             "ECG","MaxHR","Angina","OldPeak","Slope","Vessels","Thal"],
-            data
-        )
-
-# =====================================================
-# FULL DIAGNOSIS
-# =====================================================
-elif menu == "Full Diagnosis":
-
-    st.header("Complete Health Diagnosis")
-
-    age = st.number_input("Age")
-    hypertension = st.selectbox("Hypertension",[0,1])
-    glucose = st.number_input("Glucose Level")
-    bmi = st.number_input("BMI")
-
-    if st.button("Run Diagnosis"):
-
-        stroke_data = np.array([[age,hypertension,0,glucose,bmi]])
-        stroke_prob = stroke_model.predict_proba(stroke_data)[0][1]*100
-        stroke_pred = stroke_model.predict(stroke_data)
-
-        heart_data = np.array([[age,1,1,120,200,0,1,150,0,1,1,0,2]])
-        heart_prob = heart_model.predict_proba(heart_data)[0][1]*100
-        heart_pred = heart_model.predict(heart_data)
-
+    with col1:
         st.subheader("Stroke Risk")
-        gauge_chart(stroke_prob)
+        st.plotly_chart(gauge_chart(stroke_prob,"Stroke Risk %"))
 
+    with col2:
         st.subheader("Heart Disease Risk")
-        gauge_chart(heart_prob)
+        st.plotly_chart(gauge_chart(heart_prob,"Heart Disease Risk %"))
 
-        if stroke_pred[0]==1 and heart_pred[0]==1:
-            diagnosis="Both Stroke and Heart Disease Risk"
-        elif stroke_pred[0]==1:
-            diagnosis="Stroke Risk"
-        elif heart_pred[0]==1:
-            diagnosis="Heart Disease Risk"
-        else:
-            diagnosis="Low Risk"
+    # -----------------------------
+    # FINAL RESULT
+    # -----------------------------
 
-        st.success(diagnosis)
+    st.header("Diagnosis")
 
-        # -----------------------------
-        # PDF REPORT
-        # -----------------------------
-        if st.button("Download Medical Report"):
+    if stroke_prob > 50 and heart_prob > 50:
+        st.error("⚠ Patient is at risk of BOTH Stroke and Heart Disease")
 
-            styles = getSampleStyleSheet()
+    elif stroke_prob > 50:
+        st.warning("⚠ Patient is at risk of Stroke")
 
-            report = SimpleDocTemplate("medical_report.pdf")
+    elif heart_prob > 50:
+        st.warning("⚠ Patient is at risk of Heart Disease")
 
-            story = []
+    else:
+        st.success("✅ Patient has low risk")
 
-            story.append(Paragraph("AI Medical Diagnosis Report",styles['Title']))
-            story.append(Spacer(1,20))
-            story.append(Paragraph(f"Stroke Risk: {stroke_prob:.2f}%",styles['Normal']))
-            story.append(Paragraph(f"Heart Disease Risk: {heart_prob:.2f}%",styles['Normal']))
-            story.append(Paragraph(f"Final Diagnosis: {diagnosis}",styles['Normal']))
+    # -----------------------------
+    # AI EXPLANATION
+    # -----------------------------
 
-            report.build(story)
+    st.header("AI Explanation")
 
-            with open("medical_report.pdf","rb") as file:
-                st.download_button(
-                    label="Download PDF Report",
-                    data=file,
-                    file_name="patient_diagnosis_report.pdf"
-                )
+    explanation = generate_explanation(age,bmi,glucose)
+
+    for e in explanation:
+        st.write("•", e)
+
+    # -----------------------------
+    # PDF REPORT
+    # -----------------------------
+
+    st.header("Download Medical Report")
+
+    pdf_file = generate_pdf(stroke_prob, heart_prob)
+
+    with open(pdf_file,"rb") as f:
+
+        st.download_button(
+            label="Download Patient Report",
+            data=f,
+            file_name="medical_report.pdf",
+            mime="application/pdf"
+        )
